@@ -12,7 +12,7 @@ input_unit = 2 # number of input units
 hidden_unit = 8 # number of hidden units
 output_unit = 1 # number of output units
 binary_bit = 4 # number of bits 
-display_step = 20 # when model displays results
+display_step = 10000 # when model displays results
 largest_num = 2**binary_bit-1 #the largest number with given number of bits
 num_ex=50 # number of training examples we want to generate
 alpha = 0.001 # learning rate
@@ -60,113 +60,114 @@ da = {}
 dc = {}
 dc_tol = {}
 
-# derivative
-dwcx = np.zeros_like(wcx)
-dwca = np.zeros_like(wca)
-dbc = np.zeros_like(bc)
 
-dwux = np.zeros_like(wux)
-dwua = np.zeros_like(wua)
-dbu = np.zeros_like(bu)
-
-dwfx = np.zeros_like(wfx)
-dwfa = np.zeros_like(wfa)
-dbf = np.zeros_like(bf)
-
-dwox = np.zeros_like(wox)
-dwoa = np.zeros_like(woa)
-dbo = np.zeros_like(bo)
-
-dwya = np.zeros_like(wya)
-dby = np.zeros_like(by)
 
 j = 0
 err = []
+try:
+	while True:
+		# derivative
+		dwcx = np.zeros_like(wcx)
+		dwca = np.zeros_like(wca)
+		dbc = np.zeros_like(bc)
 
-for j in range(500):
-	overall = 0.
-	for time in range(1,binary_bit+1):
-		# Forward pass
-		x = np.array([m_seq[:,binary_bit-time],n_seq[:,binary_bit-time]])
-		y = np.expand_dims(p_seq[:,binary_bit-time],axis=0)
+		dwux = np.zeros_like(wux)
+		dwua = np.zeros_like(wua)
+		dbu = np.zeros_like(bu)
 
-		c_tol[time] = tanh(np.dot(wca,a[time-1]) + np.dot(wcx,x) + bc)
+		dwfx = np.zeros_like(wfx)
+		dwfa = np.zeros_like(wfa)
+		dbf = np.zeros_like(bf)
 
-		u_gate = sigmoid(np.dot(wua,a[time-1]) + np.dot(wux,x) + bu) 
-		f_gate = sigmoid(np.dot(wfa,a[time-1]) + np.dot(wfx,x) + bf) 
-		o_gate = sigmoid(np.dot(woa,a[time-1]) + np.dot(wox,x) + bo) 
+		dwox = np.zeros_like(wox)
+		dwoa = np.zeros_like(woa)
+		dbo = np.zeros_like(bo)
 
-		c[time] = u_gate*c_tol[time] + f_gate*c[time-1]
+		dwya = np.zeros_like(wya)
+		dby = np.zeros_like(by)
+		overall = 0.
+		for time in range(1,binary_bit+1):
+			# Forward pass
+			x = np.array([m_seq[:,binary_bit-time],n_seq[:,binary_bit-time]])
+			y = np.expand_dims(p_seq[:,binary_bit-time],axis=0)
 
-		a[time] = o_gate*tanh(c[time])
+			c_tol[time] = tanh(np.dot(wca,a[time-1]) + np.dot(wcx,x) + bc)
 
-		pred[binary_bit-time] = sigmoid(np.dot(wya,a[time])+by)
+			u_gate = sigmoid(np.dot(wua,a[time-1]) + np.dot(wux,x) + bu) 
+			f_gate = sigmoid(np.dot(wfa,a[time-1]) + np.dot(wfx,x) + bf) 
+			o_gate = sigmoid(np.dot(woa,a[time-1]) + np.dot(wox,x) + bo) 
 
-		overall += crossentropy(pred[binary_bit-time],y)
+			c[time] = u_gate*c_tol[time] + f_gate*c[time-1]
 
-		# Backpropagation
-		error = pred[binary_bit-time] - y
-		dwya_update = error.dot(a[time].T)
-		dwya += dwya_update
-		dby_update = np.sum(error,axis=1,keepdims=True)
-		dby += dby_update
+			a[time] = o_gate*tanh(c[time])
 
-		da[time] = wya.T.dot(error)
-		do_gate = da[time]*tanh(c[time])*sigmoid(np.dot(woa,a[time-1]) + np.dot(wox,x) + bo, deriv=True)
-		dwoa_update = do_gate.dot(a[time-1].T)
-		dwoa += dwoa_update
-		dwox_update = do_gate.dot(x.T)
-		dwox += dwox_update
-		dbo_update = np.sum(do_gate,axis=1,keepdims=True)
-		dbo += dbo_update
+			pred[binary_bit-time] = sigmoid(np.dot(wya,a[time])+by)
 
-		dc[time] = da[time]*o_gate
-		df_gate = dc[time]*c[time-1]*sigmoid(np.dot(wfa,a[time-1]) + np.dot(wfx,x) + bf, deriv=True)
-		dwfa_update = df_gate.dot(a[time-1].T)
-		dwfa += dwfa_update
-		dwfx_update = df_gate.dot(x.T)
-		dwfx += dwfx_update
-		dbf_update = np.sum(df_gate,axis=1,keepdims=True)
-		dbf += dbf_update
+			overall += crossentropy(pred[binary_bit-time],y)
 
-		du_gate = dc[time]*c_tol[time]*sigmoid(np.dot(wua,a[time-1]) + np.dot(wux,x) + bu, deriv=True)
-		dwua_update = du_gate.dot(a[time-1].T)
-		dwua += dwua_update
-		dwux_update = du_gate.dot(x.T)
-		dwux += dwux_update
-		dbu_update = np.sum(du_gate,axis=1,keepdims=True)
-		dbu += dbu_update
+			# Backpropagation
+			error = pred[binary_bit-time] - y
+			dwya_update = error.dot(a[time].T)
+			dwya += dwya_update
+			dby_update = np.sum(error,axis=1,keepdims=True)
+			dby += dby_update
 
-		dc_tol[time] = dc[time]*u_gate*tanh(np.dot(wca,a[time-1]) + np.dot(wcx,x) + bc, deriv=True)
-		dwca_update = dc_tol[time].dot(a[time-1].T)
-		dwca += dwca_update
-		dwcx_update = dc_tol[time].dot(x.T)
-		dwcx += dwcx_update
-		dbc_update = np.sum(dc_tol[time],axis=1,keepdims=True)
-		dbc += dbu_update
+			da[time] = wya.T.dot(error)
+			do_gate = da[time]*tanh(c[time])*sigmoid(np.dot(woa,a[time-1]) + np.dot(wox,x) + bo, deriv=True)
+			dwoa_update = do_gate.dot(a[time-1].T)
+			dwoa += dwoa_update
+			dwox_update = do_gate.dot(x.T)
+			dwox += dwox_update
+			dbo_update = np.sum(do_gate,axis=1,keepdims=True)
+			dbo += dbo_update
 
-	wcx -= alpha*dwcx 
-	wca -= alpha*dwca 
-	bc -= alpha*dbc
+			dc[time] = da[time]*o_gate
+			df_gate = dc[time]*c[time-1]*sigmoid(np.dot(wfa,a[time-1]) + np.dot(wfx,x) + bf, deriv=True)
+			dwfa_update = df_gate.dot(a[time-1].T)
+			dwfa += dwfa_update
+			dwfx_update = df_gate.dot(x.T)
+			dwfx += dwfx_update
+			dbf_update = np.sum(df_gate,axis=1,keepdims=True)
+			dbf += dbf_update
 
-	wux -= alpha*dwux 
-	wua -= alpha*dwua 
-	bu -= alpha*dbu
+			du_gate = dc[time]*c_tol[time]*sigmoid(np.dot(wua,a[time-1]) + np.dot(wux,x) + bu, deriv=True)
+			dwua_update = du_gate.dot(a[time-1].T)
+			dwua += dwua_update
+			dwux_update = du_gate.dot(x.T)
+			dwux += dwux_update
+			dbu_update = np.sum(du_gate,axis=1,keepdims=True)
+			dbu += dbu_update
 
-	wfx -= alpha*dwfx 
-	wfa -= alpha*dwfa 
-	bf -= alpha*dbf
+			dc_tol[time] = dc[time]*u_gate*tanh(np.dot(wca,a[time-1]) + np.dot(wcx,x) + bc, deriv=True)
+			dwca_update = dc_tol[time].dot(a[time-1].T)
+			dwca += dwca_update
+			dwcx_update = dc_tol[time].dot(x.T)
+			dwcx += dwcx_update
+			dbc_update = np.sum(dc_tol[time],axis=1,keepdims=True)
+			dbc += dbu_update
 
-	wox -= alpha*dwox 
-	woa -= alpha*dwoa 
-	bo -= alpha*dbo
+		wcx -= alpha*dwcx 
+		wca -= alpha*dwca 
+		bc -= alpha*dbc
 
-	wya -= alpha*dwya
-	by -= alpha*dby
+		wux -= alpha*dwux 
+		wua -= alpha*dwua 
+		bu -= alpha*dbu
 
-	err.append(overall)
+		wfx -= alpha*dwfx 
+		wfa -= alpha*dwfa 
+		bf -= alpha*dbf
 
-	if j%display_step==0:
+		wox -= alpha*dwox 
+		woa -= alpha*dwoa 
+		bo -= alpha*dbo
+
+		wya -= alpha*dwya
+		by -= alpha*dby
+
+		err.append(overall)
+
+		if j%display_step==0:
 			print('--------------------------')
 			print('Iteration %d'%j)
 			print('Loss %s'%overall)
@@ -174,16 +175,24 @@ for j in range(500):
 			prediction = [int(pred[i][0,test] >= 0.5) for i in range(binary_bit)]
 			print('%d + %d = %d'%(int(m[test]),int(n[test]),binary2int(prediction)))
 			print('--------------------------')
+		j+=1
+except KeyboardInterrupt as e:
+	plt.figure(figsize=(20,10))
+	plt.title('loss through each iteration')
+	plt.plot(np.arange(1,1+len(err)),err,label='loss')
+	plt.xlabel('iteration')
+	plt.ylabel('loss')
+	plt.legend()
+	plt.savefig('without_gradient_clipping.png',dpi=300)
+	plt.show()
+
+else:
+	pass
+finally:
+	pass
+
 		
 	
-plt.figure(figsize=(20,10))
-plt.title('loss through each iteration')
-plt.plot(np.arange(1,1+len(err)),err,label='loss')
-plt.xlabel('iteration')
-plt.ylabel('loss')
-plt.legend()
-plt.savefig('without_gradient_clipping.png',dpi=300)
-plt.show()
 
 
 
